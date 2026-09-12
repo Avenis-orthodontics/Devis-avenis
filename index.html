@@ -921,33 +921,91 @@
     }
 
     // TÉLÉCHARGEMENT PDF FORCE ET STRUCTURÉ SUR 1 SEULE PAGE UNIQUE
-    function downloadPDF() {
-      const element = document.getElementById('devis-node');
-      
-      element.querySelectorAll('svg').forEach(svg => {
-        svg.setAttribute('width', '13');
-        svg.setAttribute('height', '13');
+   function downloadPDF() {
+      const originalNode = document.getElementById('devis-node');
+
+      // 1. Création du clone
+      const clone = originalNode.cloneNode(true);
+      clone.classList.add('rendering-pdf');
+
+      // --- CORRECTION 1 : ICÔNES PATIENT & DATE DE CONSULTATION ---
+      const origMetaSvgs = originalNode.querySelectorAll('.meta-header .meta-icon-svg');
+      const cloneMetaIconContainers = clone.querySelectorAll('.meta-header');
+
+      origMetaSvgs.forEach((origSvg, i) => {
+        if (cloneMetaIconContainers[i]) {
+          const cloneSvg = cloneMetaIconContainers[i].querySelector('.meta-icon-svg');
+          if (cloneSvg) {
+            const svgContent = origSvg.innerHTML;
+            const viewBox = origSvg.getAttribute('viewBox') || '0 0 24 24';
+            // Injection explicite des dimensions et de la couleur dorée
+            cloneSvg.outerHTML = `<svg class="meta-icon-svg" viewBox="${viewBox}" width="15" height="15" style="width:15px; height:15px; fill: #b59453; display: inline-block; vertical-align: middle;">${svgContent}</svg>`;
+          }
+        }
       });
 
-      element.classList.add('rendering-pdf');
+      // --- CORRECTION 2 : ICÔNES DES PRESTATIONS (TABLEAU) ---
+      const origRows = originalNode.querySelectorAll('#devis-body tr');
+      const cloneRows = clone.querySelectorAll('#devis-body tr');
 
+      origRows.forEach((origRow, i) => {
+        const cloneRow = cloneRows[i];
+        if (cloneRow) {
+          const origSvg = origRow.querySelector('.icon-box svg');
+          const cloneIconBox = cloneRow.querySelector('.icon-box');
+
+          if (origSvg && cloneIconBox) {
+            const svgContent = origSvg.innerHTML;
+            const viewBox = origSvg.getAttribute('viewBox') || '0 0 24 24';
+            
+            cloneIconBox.innerHTML = `<svg viewBox="${viewBox}" width="13" height="13" style="width:13px; height:13px; stroke: #8c6e33; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block;">${svgContent}</svg>`;
+          }
+        }
+      });
+
+      // Suppression des boutons de suppression et des listes déroulantes
+      clone.querySelectorAll('.btn-del, .icon-select').forEach(el => el.remove());
+
+      // 2. Conteneur temporaire hors-écran aux dimensions A4
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      container.style.width = '210mm';
+      container.style.background = '#e5e2d9';
+
+      clone.style.width = '210mm';
+      clone.style.height = '296mm';
+      clone.style.padding = '8mm';
+      clone.style.boxSizing = 'border-box';
+      clone.style.margin = '0';
+
+      container.appendChild(clone);
+      document.body.appendChild(container);
+
+      // 3. Options HTML2PDF
       const opt = {
-        margin:       0,
-        filename:     'Devis_Avenis_Orthodontics.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { 
+        margin: 0,
+        filename: 'Devis_Avenis_Orthodontics.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
           scale: 2, 
-          useCORS: true, 
+          useCORS: true,
           logging: false,
-          scrollX: 0,
-          scrollY: 0
+          scrollY: 0,
+          scrollX: 0
         },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:    { mode: [] }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      html2pdf().set(opt).from(element).save().then(() => {
-        element.classList.remove('rendering-pdf');
+      // 4. Génération du PDF
+      html2pdf().set(opt).from(clone).save().then(() => {
+        document.body.removeChild(container);
+      }).catch(err => {
+        console.error(err);
+        if (document.body.contains(container)) {
+          document.body.removeChild(container);
+        }
       });
     }
 
